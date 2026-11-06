@@ -36,12 +36,43 @@
     /* 語言切換:依 <html lang> 隱藏另一種語言(CSS 控制,載入時不會閃現雙語) */
     html[lang="zh-TW"] [data-lang="en"] { display: none !important; }
     html[lang="en"] [data-lang="zh"] { display: none !important; }
+
+    /* ===== 列印 ===== */
+    .print-meta { display: none; }
+    @media print {
+      @page { size: A4; margin: 0; } /* 邊界為 0 時,瀏覽器不會印出網址、日期、頁碼 */
+      html, body { background: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .no-print { display: none !important; }
+      * { animation: none !important; transition: none !important; box-shadow: none !important; backdrop-filter: none !important; }
+
+      /* 用表格頁首/頁尾在每頁上下留白(@page 邊界為 0 時的替代做法) */
+      #print-root { display: table; width: 100%; }
+      #print-head { display: table-header-group; }
+      #print-head::before { content: ""; display: block; height: 10mm; }
+      #print-body { display: table-row-group; }
+      #print-foot { display: table-footer-group; }
+      .print-meta { display: block; height: 10mm; padding: 3mm 12mm 0; font-size: 9px; color: #64748b; }
+
+      section, footer { padding-top: 8mm !important; padding-bottom: 8mm !important; }
+      section > div, footer > div { max-width: none !important; padding-left: 12mm !important; padding-right: 12mm !important; }
+
+      /* 避免卡片、時間軸項目、標題被分頁切開 */
+      div[class*="rounded-"], li, img, .relative.pl-6 { break-inside: avoid; page-break-inside: avoid; }
+      h1, h2, h3, h4 { break-after: avoid; page-break-after: avoid; }
+
+      /* 深色頁尾改淺色,省墨水 */
+      footer { background: #f8fafc !important; color: #0f172a !important; }
+      footer * { color: #334155 !important; }
+      footer a { background: none !important; padding: 0 !important; color: #0369a1 !important; }
+      footer a svg { display: none; }
+    }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased selection:bg-sky-500 selection:text-white">
+<div id="print-root"><div id="print-head"></div><div id="print-body">
 
   <!-- 頂部導航 -->
-  <header class="sticky top-0 z-50 backdrop-blur-md bg-white/80 border-b border-slate-200">
+  <header class="no-print sticky top-0 z-50 backdrop-blur-md bg-white/80 border-b border-slate-200">
     <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
       <div class="font-bold text-lg tracking-tight text-slate-900">
         <span data-lang="zh">施義紳</span>
@@ -52,6 +83,11 @@
         <button id="langToggle" class="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-300 hover:bg-slate-100 transition shadow-sm flex items-center gap-1.5 cursor-pointer">
           <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"></path></svg>
           <span id="langLabel">English</span>
+        </button>
+        <button id="printBtn" class="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-300 hover:bg-slate-100 transition shadow-sm flex items-center gap-1.5 cursor-pointer">
+          <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+          <span data-lang="zh">列印</span>
+          <span data-lang="en">Print</span>
         </button>
       </div>
     </div>
@@ -721,12 +757,18 @@
         </a>
       </div>
 
-      <div class="pt-8 border-t border-slate-800 text-xs text-slate-500">
+      <div class="pt-8 border-t border-slate-800 text-xs text-slate-500 space-y-3">
+        <p class="max-w-2xl mx-auto leading-relaxed">
+        <span data-lang="zh">本頁為個人專業經歷介紹，內容不代表任何現任或曾任職公司之官方立場。未經同意，請勿轉載、修改或作其他用途。</span>
+        <span data-lang="en">This page is a personal professional profile and does not represent the official position of any current or former employer. Please do not reproduce, modify, or reuse without permission.</span>
+        </p>
         <p>Location: New Taipei / Taipei, Taiwan</p>
         <p class="mt-1">© <span id="year"></span> Tom Shih. All rights reserved.</p>
       </div>
     </div>
   </footer>
+
+</div><div id="print-foot"><div class="print-meta" id="printMeta"></div></div></div>
 
   <script>
     document.getElementById('year').textContent = new Date().getFullYear();
@@ -747,6 +789,20 @@
         setLang(html.getAttribute('lang') === 'zh-TW' ? 'en' : 'zh-TW');
       });
       setLang('zh-TW'); // 一律以中文開啟,不記憶選擇
+    })();
+
+    // 列印:按鈕 + 列印頁尾(來源網址與日期)
+    (function () {
+      function fill() {
+        var d = new Date();
+        var ds = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        var zh = document.documentElement.getAttribute('lang') === 'zh-TW';
+        document.getElementById('printMeta').textContent = zh
+          ? '來源：' + location.href + '｜列印日期：' + ds
+          : 'Source: ' + location.href + ' | Printed: ' + ds;
+      }
+      window.addEventListener('beforeprint', fill);
+      document.getElementById('printBtn').addEventListener('click', function () { fill(); window.print(); });
     })();
   </script>
 </body>
